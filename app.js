@@ -1,477 +1,245 @@
-// --- 핵심 전역 설정 변수 ---
-const CHUNK_SIZE = 16;
-let renderDistance = 2; // 오버월드 청크 로딩 범위
-let activeDimension = 'overworld';
-let isThirdPerson = false;
-
-let scene, camera, renderer;
-let simplex = new SimplexNoise();
-let loadedChunks = {}; // 오버월드 무한 청크 저장소
-let fixedDimensionGroup = null; // 네더/엔더 고정 맵 그룹
-
-// 플레이어 물리 엔진 및 사양
-let player = {
-    pos: new THREE.Vector3(0, 15, 0),
-    vel: new THREE.Vector3(0, 0, 0),
-    size: new THREE.Vector3(0.6, 1.8, 0.6),
-    isGrounded: false
-};
-
-let playerMesh; // 3인칭 아바타 메시
-let selectedBlockType = 1;
-
-// 조이스틱 & 카메라 컨트롤 변수
-let joystickInput = { x: 0, y: 0 };
-let cameraRotation = { yaw: 0, pitch: 0 };
-let isTouchingLook = false;
-let lastTouchPos = { x: 0, y: 0 };
-const keys = {};
-
-// 차원별 재질 정의
-const materials = {
-    overworld: [
-        new THREE.MeshLambertMaterial({ color: 0x4ade80 }), // Grass
-        new THREE.MeshLambertMaterial({ color: 0x78350f }), // Dirt
-        new THREE.MeshLambertMaterial({ color: 0x6b7280 }), // Stone
-        new THREE.MeshLambertMaterial({ color: 0xb45309 }), // Wood
-        new THREE.MeshLambertMaterial({ color: 0xc084fc })  // Ether
-    ],
-    nether: [
-        new THREE.MeshLambertMaterial({ color: 0x7f1d1d }), // Netherrack
-        new THREE.MeshLambertMaterial({ color: 0x451a03 }), // Basalt
-        new THREE.MeshLambertMaterial({ color: 0xd97706 })  // Glowstone
-    ],
-    ender: [
-        new THREE.MeshLambertMaterial({ color: 0xfef08a }), // End Stone
-        new THREE.MeshLambertMaterial({ color: 0x3b0764 })  // Obsidian
-    ]
-};
-
-const blockGeo = new THREE.BoxGeometry(1, 1, 1);
-
-function init() {
-    // 3D Scene 구성
-    scene = new THREE.Scene();
-
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    
-    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('webgl-canvas'), antialias: false });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // 조명
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
-    dirLight.position.set(30, 50, 30);
-    scene.add(dirLight);
-
-    // 3인칭 플레이어 아바타 제작
-    createPlayerAvatar();
-
-    // 초기 환경 설정 및 맵 세팅
-    setDimensionEnvironment('overworld');
-
-    // UI 및 이벤트 핸들러 바인딩
-    setupUI();
-    setupBrawlStarsJoystick();
-    setupInputEvents();
-
-    // 메인 루프 시작
-    animate();
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
-function createPlayerAvatar() {
-    const group = new THREE.Group();
-    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x2563eb });
-    const headMat = new THREE.MeshLambertMaterial({ color: 0xfcd34d });
-
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.9, 0.4), bodyMat);
-    body.position.y = 0.45;
-    group.add(body);
-
-    const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), headMat);
-    head.position.y = 1.1;
-    group.add(head);
-
-    playerMesh = group;
-    scene.add(playerMesh);
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #1a1a1a;
+    font-family: 'Courier New', Courier, monospace;
 }
 
-// --- 오버월드 무한 청크 알고리즘 ---
-function getChunkKey(cx, cz) {
-    return `${cx},${cz}`;
+#webgl-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
-function generateChunk(cx, cz) {
-    const chunkGroup = new THREE.Group();
-    const startX = cx * CHUNK_SIZE;
-    const startZ = cz * CHUNK_SIZE;
-
-    for (let x = 0; x < CHUNK_SIZE; x++) {
-        for (let z = 0; z < CHUNK_SIZE; z++) {
-            const worldX = startX + x;
-            const worldZ = startZ + z;
-
-            const height = Math.floor(simplex.noise2D(worldX * 0.04, worldZ * 0.04) * 6) + 6;
-
-            for (let y = 0; y <= height; y++) {
-                let matIdx = 0;
-                if (y < height - 2) matIdx = 2; // Stone
-                else if (y < height) matIdx = 1; // Dirt
-
-                const mesh = new THREE.Mesh(blockGeo, materials.overworld[matIdx]);
-                mesh.position.set(worldX, y, worldZ);
-                chunkGroup.add(mesh);
-            }
-        }
-    }
-    scene.add(chunkGroup);
-    return chunkGroup;
+/* 마인크래프트 레트로 UI 스타일 */
+.mc-panel {
+    background: #8b8b8b;
+    border: 4px solid #373737;
+    box-shadow: inset -4px -4px 0px #555555, inset 4px 4px 0px #ffffff;
 }
 
-function updateChunks() {
-    if (activeDimension !== 'overworld') return;
-
-    const pChunkX = Math.floor(player.pos.x / CHUNK_SIZE);
-    const pChunkZ = Math.floor(player.pos.z / CHUNK_SIZE);
-    const activeKeys = new Set();
-
-    for (let x = -renderDistance; x <= renderDistance; x++) {
-        for (let z = -renderDistance; z <= renderDistance; z++) {
-            const key = getChunkKey(pChunkX + x, pChunkZ + z);
-            activeKeys.add(key);
-
-            if (!loadedChunks[key]) {
-                loadedChunks[key] = generateChunk(pChunkX + x, pChunkZ + z);
-            }
-        }
-    }
-
-    // 범위 밖 청크 메모리 해제
-    Object.keys(loadedChunks).forEach(key => {
-        if (!activeKeys.has(key)) {
-            scene.remove(loadedChunks[key]);
-            delete loadedChunks[key];
-        }
-    });
+.mc-btn {
+    background: #737373;
+    color: #ffffff;
+    border: 2px solid #000000;
+    box-shadow: inset -2px -2px 0px #373737, inset 2px 2px 0px #aaaaaa;
+    padding: 6px 12px;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+    text-shadow: 1px 1px 0px #000;
 }
 
-// --- 네더 / 엔더 고정형 맵 생성 (렉 방지) ---
-function generateFixedDimension(dim) {
-    if (fixedDimensionGroup) scene.remove(fixedDimensionGroup);
-    fixedDimensionGroup = new THREE.Group();
-
-    const size = 24;
-    for (let x = -size / 2; x < size / 2; x++) {
-        for (let z = -size / 2; z < size / 2; z++) {
-            const height = Math.floor(Math.sin(x * 0.3) * Math.cos(z * 0.3) * 3) + 5;
-            for (let y = 0; y <= height; y++) {
-                const matIdx = dim === 'nether' ? (y === height ? 0 : 1) : 0;
-                const mesh = new THREE.Mesh(blockGeo, materials[dim][matIdx]);
-                mesh.position.set(x, y, z);
-                fixedDimensionGroup.add(mesh);
-            }
-        }
-    }
-    scene.add(fixedDimensionGroup);
+.mc-btn:active {
+    box-shadow: inset 2px 2px 0px #000000, inset -2px -2px 0px #aaaaaa;
+    background: #555555;
 }
 
-function setDimensionEnvironment(dim) {
-    activeDimension = dim;
-    document.getElementById('dim-label').innerText = dim === 'overworld' ? '오버월드' : (dim === 'nether' ? '네더월드' : '엔더월드');
-
-    // 오버월드 청크 초기화
-    Object.keys(loadedChunks).forEach(k => scene.remove(loadedChunks[k]));
-    loadedChunks = {};
-
-    if (fixedDimensionGroup) {
-        scene.remove(fixedDimensionGroup);
-        fixedDimensionGroup = null;
-    }
-
-    if (dim === 'overworld') {
-        scene.background = new THREE.Color(0x78a7ff);
-        scene.fog = new THREE.FogExp2(0x78a7ff, 0.015);
-        updateChunks();
-    } else if (dim === 'nether') {
-        scene.background = new THREE.Color(0x3f0707);
-        scene.fog = new THREE.FogExp2(0x3f0707, 0.035);
-        generateFixedDimension('nether');
-    } else if (dim === 'ender') {
-        scene.background = new THREE.Color(0x0a0518);
-        scene.fog = new THREE.FogExp2(0x0a0518, 0.025);
-        generateFixedDimension('ender');
-    }
+.mc-badge {
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 6px 12px;
+    border: 2px solid #373737;
+    font-size: 12px;
+    text-shadow: 1px 1px 0px #000;
 }
 
-// --- 브롤스타즈 스타일 유연성 조이스틱 로직 ---
-function setupBrawlStarsJoystick() {
-    const zone = document.getElementById('joystick-zone');
-    const base = document.getElementById('joystick-base');
-    const handle = document.getElementById('joystick-handle');
-
-    const maxRadius = 40;
-    let activeTouchId = null;
-    let centerPos = { x: 0, y: 0 };
-
-    zone.addEventListener('touchstart', (e) => {
-        if (activeTouchId !== null) return;
-        const touch = e.changedTouches[0];
-        activeTouchId = touch.identifier;
-
-        const rect = zone.getBoundingClientRect();
-        centerPos = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-        updateJoystick(touch.clientX, touch.clientY);
-    });
-
-    window.addEventListener('touchmove', (e) => {
-        if (activeTouchId === null) return;
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === activeTouchId) {
-                const touch = e.changedTouches[i];
-                updateJoystick(touch.clientX, touch.clientY);
-            }
-        }
-    });
-
-    const resetJoystick = (e) => {
-        if (activeTouchId === null) return;
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            if (e.changedTouches[i].identifier === activeTouchId) {
-                activeTouchId = null;
-                handle.style.transform = `translate(-50%, -50%)`;
-                joystickInput = { x: 0, y: 0 };
-            }
-        }
-    };
-
-    window.addEventListener('touchend', resetJoystick);
-    window.addEventListener('touchcancel', resetJoystick);
-
-    function updateJoystick(clientX, clientY) {
-        let dx = clientX - centerPos.x;
-        let dy = clientY - centerPos.y;
-        let dist = Math.hypot(dx, dy);
-
-        // 한계 반경 제한 내 각도 추적
-        if (dist > maxRadius) {
-            dx = (dx / dist) * maxRadius;
-            dy = (dy / dist) * maxRadius;
-        }
-
-        handle.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-        joystickInput.x = dx / maxRadius;
-        joystickInput.y = dy / maxRadius;
-    }
+#top-bar {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 10;
 }
 
-// --- 복셀 AABB 물리 엔진 ---
-function updatePhysics(delta) {
-    // 입력 처리
-    let inputX = joystickInput.x;
-    let inputZ = joystickInput.y;
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 16px;
+    height: 16px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 5;
+}
+#crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 2px #000;
+}
+#crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
+#crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
 
-    if (keys['KeyW']) inputZ = -1;
-    if (keys['KeyS']) inputZ = 1;
-    if (keys['KeyA']) inputX = -1;
-    if (keys['KeyD']) inputX = 1;
+/* 모달창 공통 */
+.modal-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 30;
+}
+.modal-overlay.hidden { display: none; }
 
-    const speed = 5.0;
-    const forward = new THREE.Vector3(Math.sin(cameraRotation.yaw), 0, Math.cos(cameraRotation.yaw));
-    const side = new THREE.Vector3(Math.cos(cameraRotation.yaw), 0, -Math.sin(cameraRotation.yaw));
-
-    const moveDir = new THREE.Vector3()
-        .addScaledVector(forward, -inputZ)
-        .addScaledVector(side, inputX);
-
-    if (moveDir.lengthSq() > 0) moveDir.normalize();
-
-    player.vel.x = moveDir.x * speed;
-    player.vel.z = moveDir.z * speed;
-
-    // 중력 적용
-    player.vel.y -= 20.0 * delta;
-
-    // 위치 업데이트 및 바닥 충돌 판정
-    player.pos.x += player.vel.x * delta;
-    player.pos.z += player.vel.z * delta;
-    player.pos.y += player.vel.y * delta;
-
-    // 간이 Y축 충돌 체크
-    if (player.pos.y <= 10.0) {
-        player.pos.y = 10.0;
-        player.vel.y = 0;
-        player.isGrounded = true;
-    } else {
-        player.isGrounded = false;
-    }
-
-    // 1인칭 / 3인칭 시점 동기화
-    playerMesh.position.copy(player.pos);
-    playerMesh.rotation.y = cameraRotation.yaw;
-    playerMesh.visible = isThirdPerson;
-
-    if (isThirdPerson) {
-        document.getElementById('crosshair').style.display = 'none';
-        const dist = 4.5;
-        camera.position.x = player.pos.x - Math.sin(cameraRotation.yaw) * dist;
-        camera.position.z = player.pos.z - Math.cos(cameraRotation.yaw) * dist;
-        camera.position.y = player.pos.y + 2.2 - Math.sin(cameraRotation.pitch) * 2;
-    } else {
-        document.getElementById('crosshair').style.display = 'block';
-        camera.position.copy(player.pos).add(new THREE.Vector3(0, 1.4, 0));
-    }
-
-    camera.rotation.order = "YXZ";
-    camera.rotation.y = cameraRotation.yaw;
-    camera.rotation.x = cameraRotation.pitch;
-
-    updateChunks();
+.modal-content {
+    width: 340px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    color: #fff;
+    text-shadow: 1px 1px 0px #000;
 }
 
-// --- UI 및 이벤트 설정 ---
-function setupUI() {
-    renderHUD();
+.mc-title { font-size: 16px; text-align: center; margin-bottom: 4px; }
+.mc-desc { font-size: 11px; text-align: center; color: #ddd; }
 
-    document.getElementById('btn-menu').addEventListener('click', () => {
-        document.getElementById('menu-modal').classList.remove('hidden');
-    });
+.setting-item { display: flex; flex-direction: column; gap: 6px; }
+.setting-item input[type="range"] { width: 100%; accent-color: #567d46; }
+.btn-group { display: flex; gap: 4px; justify-content: space-between; }
 
-    document.getElementById('btn-close-menu').addEventListener('click', () => {
-        document.getElementById('menu-modal').classList.add('hidden');
-    });
-
-    document.getElementById('chunk-slider').addEventListener('input', (e) => {
-        renderDistance = parseInt(e.target.value);
-        document.getElementById('chunk-val').innerText = renderDistance;
-        updateChunks();
-    });
-
-    document.getElementById('btn-perspective').addEventListener('click', () => {
-        isThirdPerson = !isThirdPerson;
-    });
-
-    document.getElementById('btn-jump').addEventListener('click', () => {
-        if (player.isGrounded) player.vel.y = 7.5;
-    });
-
-    document.getElementById('btn-break').addEventListener('click', performBlockBreak);
-    document.getElementById('btn-place').addEventListener('click', performBlockPlace);
+/* 스킨 에디터 그리드 */
+.pixel-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 2px;
+    background: #404040;
+    padding: 8px;
+    border: 2px solid #262626;
+    align-self: center;
 }
 
-function performBlockBreak() {
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-    const blocks = [];
-    if (activeDimension === 'overworld') {
-        Object.values(loadedChunks).forEach(group => blocks.push(...group.children));
-    } else if (fixedDimensionGroup) {
-        blocks.push(...fixedDimensionGroup.children);
-    }
-
-    const intersects = raycaster.intersectObjects(blocks);
-    if (intersects.length > 0 && intersects[0].distance < 5) {
-        const hit = intersects[0].object;
-        hit.parent.remove(hit);
-    }
+.pixel-cell {
+    width: 26px;
+    height: 26px;
+    background: #e5e5e5;
+    border: 1px solid #737373;
+    cursor: pointer;
 }
 
-function performBlockPlace() {
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-    const blocks = [];
-    if (activeDimension === 'overworld') {
-        Object.values(loadedChunks).forEach(group => blocks.push(...group.children));
-    } else if (fixedDimensionGroup) {
-        blocks.push(...fixedDimensionGroup.children);
-    }
-
-    const intersects = raycaster.intersectObjects(blocks);
-    if (intersects.length > 0 && intersects[0].distance < 5) {
-        const hit = intersects[0];
-        const placePos = new THREE.Vector3().copy(hit.point).add(hit.face.normal.clone().multiplyScalar(0.5));
-        
-        const mesh = new THREE.Mesh(blockGeo, materials[activeDimension][selectedBlockType - 1] || materials[activeDimension][0]);
-        mesh.position.set(Math.round(placePos.x), Math.round(placePos.y), Math.round(placePos.z));
-        hit.object.parent.add(mesh);
-    }
+.color-palette {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 4px;
 }
 
-function setupInputEvents() {
-    window.addEventListener('keydown', (e) => keys[e.code] = true);
-    window.addEventListener('keyup', (e) => keys[e.code] = false);
+.color-swatch {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #000;
+    cursor: pointer;
+    box-shadow: inset 1px 1px 0 rgba(255,255,255,0.4);
+}
+.color-swatch.active { border: 2px solid #fff; transform: scale(1.1); }
 
-    // 터치 시점 조종 (화면 우측 드래그)
-    window.addEventListener('touchstart', (e) => {
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            if (touch.clientX > window.innerWidth / 2 && !touch.target.closest('#mobile-controls') && !touch.target.closest('#hud')) {
-                isTouchingLook = true;
-                lastTouchPos = { x: touch.clientX, y: touch.clientY };
-            }
-        }
-    });
-
-    window.addEventListener('touchmove', (e) => {
-        if (!isTouchingLook) return;
-        for (let i = 0; i < e.changedTouches.length; i++) {
-            const touch = e.changedTouches[i];
-            if (touch.clientX > window.innerWidth / 2) {
-                const dx = touch.clientX - lastTouchPos.x;
-                const dy = touch.clientY - lastTouchPos.y;
-
-                cameraRotation.yaw -= dx * 0.004;
-                cameraRotation.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, cameraRotation.pitch - dy * 0.004));
-
-                lastTouchPos = { x: touch.clientX, y: touch.clientY };
-            }
-        }
-    });
-
-    window.addEventListener('touchend', () => isTouchingLook = false);
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+/* HUD & 체력 하트 바 */
+#hud {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    z-index: 10;
 }
 
-function renderHUD() {
-    const hearts = document.getElementById('hearts-container');
-    const food = document.getElementById('food-container');
-    hearts.innerHTML = ''; food.innerHTML = '';
-    for (let i = 0; i < 10; i++) {
-        hearts.innerHTML += '<div class="heart"></div>';
-        food.innerHTML += '<div class="food"></div>';
-    }
+.status-bar { display: flex; gap: 4px; }
+.mc-status-row { display: flex; gap: 3px; }
+
+.heart {
+    width: 14px;
+    height: 14px;
+    background-color: #cc2e2e;
+    border: 1px solid #000;
+    box-shadow: inset 1px 1px 0 #ff6b6b;
+}
+.heart.empty { background-color: #4a4a4a; box-shadow: inset 1px 1px 0 #2a2a2a; }
+
+#hotbar { display: flex; padding: 3px; gap: 3px; }
+
+.slot {
+    width: 38px;
+    height: 38px;
+    background: #8b8b8b;
+    border: 2px solid #373737;
+    box-shadow: inset 2px 2px 0px #373737, inset -2px -2px 0px #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.slot.selected { border: 3px solid #ffffff; box-shadow: inset 2px 2px 0px #000000; }
+
+.block-icon { width: 22px; height: 22px; border: 1px solid #000; }
+.block-icon.grass { background: #567d46; }
+.block-icon.dirt { background: #866043; }
+.block-icon.stone { background: #737373; }
+.block-icon.wood { background: #6b4f2c; }
+.block-icon.ore { background: #5b3e8c; }
+
+/* 조이스틱 및 컨트롤 버튼 */
+#joystick-zone {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    width: 150px;
+    height: 150px;
+    z-index: 20;
+    touch-action: none;
 }
 
-function selectSlot(index) {
-    selectedBlockType = index + 1;
-    document.querySelectorAll('.slot').forEach((slot, idx) => {
-        if (idx === index) slot.classList.add('selected');
-        else slot.classList.remove('selected');
-    });
+#joystick-base {
+    position: absolute;
+    width: 110px;
+    height: 110px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.35);
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
 }
 
-function switchDimension(dim) {
-    setDimensionEnvironment(dim);
-    document.getElementById('menu-modal').classList.add('hidden');
+#joystick-handle {
+    position: absolute;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    border: 2px solid #000;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
 }
 
-let lastTime = performance.now();
-function animate() {
-    requestAnimationFrame(animate);
-    const now = performance.now();
-    const delta = Math.min((now - lastTime) / 1000, 0.1);
-    lastTime = now;
-
-    updatePhysics(delta);
-    renderer.render(scene, camera);
+#mobile-controls {
+    position: absolute;
+    bottom: 25px;
+    right: 20px;
+    display: flex;
+    gap: 8px;
+    z-index: 20;
 }
 
-window.onload = init;
+.action-btn { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.btn-danger { background: #b91c1c; }
+.btn-success { background: #15803d; }
