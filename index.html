@@ -3,642 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Aetheria: Infinite Voxel Realm</title>
-    <!-- Three.js 3D Library -->
+    <title>Craft Realm 3D</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Three.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Simplex Noise for Infinite Chunk Generation -->
+    <!-- Simplex Noise for Infinite Chunk Terrain -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-touch-callout: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
-        body, html {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Courier New', Courier, monospace;
-        }
-        #webgl-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-
-        /* --- Minecraft Style Classic UI --- */
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 16px;
-            height: 16px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 10;
-        }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.8);
-            box-shadow: 0 0 2px #000;
-        }
-        #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
-        #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
-
-        /* HUD Overlay */
-        #hud {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-            z-index: 10;
-            pointer-events: none;
-        }
-
-        .status-bar {
-            display: flex;
-            justify-content: space-between;
-            width: 360px;
-            padding: 0 4px;
-        }
-        .hearts, .food {
-            display: flex;
-            gap: 2px;
-        }
-        .heart-icon, .food-icon {
-            width: 12px;
-            height: 12px;
-            background-color: #e11d48;
-            border: 1px solid #000;
-            box-shadow: inset 1px 1px 0 #fda4af;
-        }
-        .food-icon {
-            background-color: #d97706;
-            box-shadow: inset 1px 1px 0 #fde68a;
-        }
-
-        /* Minecraft Classic Hotbar */
-        #hotbar {
-            display: flex;
-            background: #8b8b8b;
-            border: 4px solid #373737;
-            box-shadow: inset -2px -2px 0 #555, inset 2px 2px 0 #fff;
-            padding: 2px;
-            gap: 2px;
-            pointer-events: auto;
-        }
-        .slot {
-            width: 40px;
-            height: 40px;
-            background: #8b8b8b;
-            border: 2px solid #373737;
-            box-shadow: inset 2px 2px 0 #373737, inset -2px -2px 0 #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            position: relative;
-        }
-        .slot.selected {
-            border: 3px solid #ffffff;
-            box-shadow: inset 2px 2px 0 #000;
-            margin: -1px;
-        }
-        .block-preview {
-            width: 22px;
-            height: 22px;
-            border: 1px solid #000;
-        }
-
-        /* Top Dimension Selector & Ether Bar */
-        #dimension-panel {
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            z-index: 10;
-            background: #8b8b8b;
-            border: 3px solid #373737;
-            box-shadow: inset -2px -2px 0 #555, inset 2px 2px 0 #fff;
-            padding: 8px 12px;
-            color: #fff;
-            font-size: 12px;
-            text-shadow: 2px 2px #000;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .dim-btn {
-            background: #555;
-            color: #fff;
-            border: 2px solid #000;
-            padding: 4px 8px;
-            cursor: pointer;
-            font-size: 11px;
-            text-shadow: 1px 1px #000;
-        }
-        .dim-btn:active { background: #333; }
-
-        /* --- Circular Touch Joystick for Mobile/Tablet --- */
-        #joystick-wrapper {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            width: 120px;
-            height: 120px;
-            background: rgba(0, 0, 0, 0.4);
-            border: 3px solid rgba(255, 255, 255, 0.4);
-            border-radius: 50%;
-            z-index: 20;
-            touch-action: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        #joystick-stick {
-            width: 50px;
-            height: 50px;
-            background: rgba(255, 255, 255, 0.7);
-            border: 2px solid #000;
-            border-radius: 50%;
-            position: absolute;
-            box-shadow: 0 0 10px rgba(0,0,0,0.5);
-        }
-
-        /* Mobile Action Buttons */
-        #mobile-actions {
-            position: absolute;
-            bottom: 30px;
-            right: 30px;
-            display: flex;
-            gap: 15px;
-            z-index: 20;
-        }
-        .action-btn {
-            width: 60px;
-            height: 60px;
-            background: #8b8b8b;
-            border: 3px solid #373737;
-            box-shadow: inset -2px -2px 0 #555, inset 2px 2px 0 #fff;
-            border-radius: 50%;
-            color: #fff;
-            font-weight: bold;
-            font-size: 14px;
-            text-shadow: 1px 1px #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            touch-action: manipulation;
-        }
-        .action-btn:active {
-            background: #555;
-        }
-    </style>
 </head>
 <body>
 
     <canvas id="webgl-canvas"></canvas>
+    
+    <!-- 십자선 (1인칭 모드 전용) -->
     <div id="crosshair"></div>
 
-    <!-- Dimension & Ether Panel -->
-    <div id="dimension-panel">
-        <div>현재 차원: <span id="current-dim-text" style="color:#fde047;">오버월드</span></div>
-        <div>에테르 에너지: <span id="ether-count">0</span> / 10</div>
-        <div style="display:flex; gap:4px; margin-top:4px;">
-            <button class="dim-btn" onclick="switchDimension('overworld')">오버월드</button>
-            <button class="dim-btn" onclick="switchDimension('nether')">네더월드</button>
-            <button class="dim-btn" onclick="switchDimension('ender')">엔더월드</button>
+    <!-- 상단 상태 & 메뉴 제어바 -->
+    <header id="top-bar">
+        <button id="btn-menu" class="mc-btn">메뉴</button>
+        <div id="dimension-badge" class="mc-badge">차원: <span id="dim-label">오버월드</span></div>
+        <button id="btn-perspective" class="mc-btn">시점 전환 (1P/3P)</button>
+    </header>
+
+    <!-- 설정 / 메뉴 모달 UI -->
+    <div id="menu-modal" class="hidden">
+        <div class="modal-content mc-panel">
+            <h2 class="mc-title">게임 설정</h2>
+            
+            <div class="setting-item">
+                <label for="chunk-slider">오버월드 청크 로딩 거리: <span id="chunk-val">2</span></label>
+                <input type="range" id="chunk-slider" min="1" max="4" value="2" step="1">
+            </div>
+
+            <div class="setting-item">
+                <label>차원 이동</label>
+                <div class="btn-group">
+                    <button class="mc-btn dim-select" onclick="switchDimension('overworld')">오버월드</button>
+                    <button class="mc-btn dim-select" onclick="switchDimension('nether')">네더월드</button>
+                    <button class="mc-btn dim-select" onclick="switchDimension('ender')">엔더월드</button>
+                </div>
+            </div>
+
+            <button id="btn-close-menu" class="mc-btn font-bold">닫기</button>
         </div>
     </div>
 
-    <!-- HUD Bar -->
+    <!-- 하단 HUD (체력, 허기, 핫바) -->
     <div id="hud">
         <div class="status-bar">
-            <div class="hearts" id="hearts-container"></div>
-            <div class="food" id="food-container"></div>
+            <div id="hearts-container" class="mc-status-row"></div>
+            <div id="food-container" class="mc-status-row"></div>
         </div>
-        <div id="hotbar">
-            <div class="slot selected" onclick="selectSlot(0)"><div class="block-preview" style="background:#4ade80;"></div></div>
-            <div class="slot" onclick="selectSlot(1)"><div class="block-preview" style="background:#78350f;"></div></div>
-            <div class="slot" onclick="selectSlot(2)"><div class="block-preview" style="background:#6b7280;"></div></div>
-            <div class="slot" onclick="selectSlot(3)"><div class="block-preview" style="background:#a855f7;"></div></div>
+        <div id="hotbar" class="mc-panel">
+            <div class="slot selected" onclick="selectSlot(0)"><div class="block-icon grass"></div></div>
+            <div class="slot" onclick="selectSlot(1)"><div class="block-icon dirt"></div></div>
+            <div class="slot" onclick="selectSlot(2)"><div class="block-icon stone"></div></div>
+            <div class="slot" onclick="selectSlot(3)"><div class="block-icon wood"></div></div>
+            <div class="slot" onclick="selectSlot(4)"><div class="block-icon ether"></div></div>
         </div>
     </div>
 
-    <!-- Circular Joystick for Touch Devices -->
-    <div id="joystick-wrapper">
-        <div id="joystick-stick"></div>
+    <!-- 터치 및 제스처용 원형 조이스틱 영역 -->
+    <div id="joystick-zone">
+        <div id="joystick-base">
+            <div id="joystick-handle"></div>
+        </div>
     </div>
 
-    <!-- Mobile Touch Action Buttons -->
-    <div id="mobile-actions">
-        <div class="action-btn" id="btn-jump">점프</div>
-        <div class="action-btn" id="btn-action" style="background:#e11d48;">파괴</div>
+    <!-- 모바일 터치 전용 행동 버튼 -->
+    <div id="mobile-controls">
+        <button id="btn-jump" class="action-btn mc-btn">점프</button>
+        <button id="btn-break" class="action-btn mc-btn btn-danger">파괴</button>
+        <button id="btn-place" class="action-btn mc-btn btn-success">설치</button>
     </div>
 
-    <script>
-        // --- Game Config & Variables ---
-        const CHUNK_SIZE = 16;
-        const RENDER_DISTANCE = 2; // Radius of chunks to render around player
-        const BLOCK_SIZE = 1;
-
-        let scene, camera, renderer;
-        let simplex = new SimplexNoise();
-        let loadedChunks = {}; // Storage for active chunks
-        let activeDimension = 'overworld';
-        let etherEnergy = 0;
-
-        let selectedBlockType = 1; // 1: Grass/Dirt, 2: Wood, 3: Stone, 4: Ether Ore
-        let playerPos = new THREE.Vector3(0, 12, 0);
-        let playerVelocity = new THREE.Vector3();
-        let isGrounded = false;
-
-        // Controls
-        const keys = {};
-        let joystickVector = { x: 0, y: 0 };
-        let isTouchLook = false;
-        let lastTouchX = 0, lastTouchY = 0;
-        let cameraRotation = { yaw: 0, pitch: 0 };
-
-        // Block Materials with Pixel Textures
-        const materials = {
-            overworld: [
-                new THREE.MeshLambertMaterial({ color: 0x4ade80 }), // Grass
-                new THREE.MeshLambertMaterial({ color: 0x78350f }), // Wood
-                new THREE.MeshLambertMaterial({ color: 0x6b7280 }), // Stone
-                new THREE.MeshLambertMaterial({ color: 0xa855f7 })  // Ether Ore
-            ],
-            nether: [
-                new THREE.MeshLambertMaterial({ color: 0x991b1b }), // Netherrack
-                new THREE.MeshLambertMaterial({ color: 0x7c2d12 }), // Basalt
-                new THREE.MeshLambertMaterial({ color: 0xd97706 }), // Glowstone
-                new THREE.MeshLambertMaterial({ color: 0xc084fc })  // Ether Ore
-            ],
-            ender: [
-                new THREE.MeshLambertMaterial({ color: 0xfef08a }), // End Stone
-                new THREE.MeshLambertMaterial({ color: 0x3b0764 }), // Obsidian
-                new THREE.MeshLambertMaterial({ color: 0x0284c7 }), // Purpur
-                new THREE.MeshLambertMaterial({ color: 0xe879f9 })  // Ether Ore
-            ]
-        };
-
-        const blockGeometry = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-
-        function init() {
-            // Setup Scene
-            scene = new THREE.Scene();
-            setDimensionEnvironment('overworld');
-
-            // Camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.copy(playerPos);
-
-            // Renderer
-            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('webgl-canvas'), antialias: false });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-            scene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-            dirLight.position.set(50, 100, 50);
-            scene.add(dirLight);
-
-            // Initialize UI Components
-            renderHUD();
-            setupJoystick();
-            setupEventListeners();
-
-            // Initial Chunk Generation
-            updateChunks();
-
-            // Start Animation Loop
-            animate();
-        }
-
-        // --- Infinite Chunk Generation Engine ---
-        function getChunkKey(cx, cz) {
-            return `${cx},${cz}`;
-        }
-
-        function generateChunk(cx, cz) {
-            const chunkGroup = new THREE.Group();
-            const startX = cx * CHUNK_SIZE;
-            const startZ = cz * CHUNK_SIZE;
-
-            for (let x = 0; x < CHUNK_SIZE; x++) {
-                for (let z = 0; z < CHUNK_SIZE; z++) {
-                    const worldX = startX + x;
-                    const worldZ = startZ + z;
-
-                    // Terrain Height Calculation via Noise
-                    let heightScale = activeDimension === 'nether' ? 6 : (activeDimension === 'ender' ? 4 : 8);
-                    let noiseVal = simplex.noise2D(worldX * 0.05, worldZ * 0.05);
-                    let height = Math.floor(noiseVal * heightScale) + 5;
-
-                    for (let y = 0; y <= height; y++) {
-                        let matIdx = 0;
-                        if (y < height - 2) matIdx = 2; // Stone layer
-                        else if (y < height) matIdx = 1; // Dirt/Wood layer
-
-                        // Rare Ether Ore Generation (Unique Mechanism)
-                        if (Math.random() < 0.02 && y === height) {
-                            matIdx = 3;
-                        }
-
-                        const mesh = new THREE.Mesh(blockGeometry, materials[activeDimension][matIdx]);
-                        mesh.position.set(worldX, y, worldZ);
-                        chunkGroup.add(mesh);
-                    }
-                }
-            }
-
-            scene.add(chunkGroup);
-            return chunkGroup;
-        }
-
-        function updateChunks() {
-            const currentChunkX = Math.floor(playerPos.x / CHUNK_SIZE);
-            const currentChunkZ = Math.floor(playerPos.y / CHUNK_SIZE);
-
-            const newKeys = new Set();
-
-            for (let x = -RENDER_DISTANCE; x <= RENDER_DISTANCE; x++) {
-                for (let z = -RENDER_DISTANCE; z <= RENDER_DISTANCE; z++) {
-                    const cx = currentChunkX + x;
-                    const cz = currentChunkZ + z;
-                    const key = getChunkKey(cx, cz);
-                    newKeys.add(key);
-
-                    if (!loadedChunks[key]) {
-                        loadedChunks[key] = generateChunk(cx, cz);
-                    }
-                }
-            }
-
-            // Unload distant chunks to save memory
-            Object.keys(loadedChunks).forEach(key => {
-                if (!newKeys.has(key)) {
-                    scene.remove(loadedChunks[key]);
-                    delete loadedChunks[key];
-                }
-            });
-        }
-
-        // --- Dimension & Environment Switcher ---
-        function setDimensionEnvironment(dim) {
-            activeDimension = dim;
-            const textEl = document.getElementById('current-dim-text');
-
-            if (dim === 'overworld') {
-                scene.background = new THREE.Color(0x87ceeb);
-                scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
-                textEl.innerText = "오버월드";
-                textEl.style.color = "#fde047";
-            } else if (dim === 'nether') {
-                scene.background = new THREE.Color(0x450a0a);
-                scene.fog = new THREE.FogExp2(0x450a0a, 0.04);
-                textEl.innerText = "네더월드";
-                textEl.style.color = "#f87171";
-            } else if (dim === 'ender') {
-                scene.background = new THREE.Color(0x090514);
-                scene.fog = new THREE.FogExp2(0x090514, 0.03);
-                textEl.innerText = "엔더월드";
-                textEl.style.color = "#c084fc";
-            }
-
-            // Reload chunks for new dimension
-            Object.keys(loadedChunks).forEach(k => scene.remove(loadedChunks[k]));
-            loadedChunks = {};
-        }
-
-        function switchDimension(dim) {
-            setDimensionEnvironment(dim);
-            updateChunks();
-        }
-
-        // --- Circular Joystick Controls ---
-        function setupJoystick() {
-            const wrapper = document.getElementById('joystick-wrapper');
-            const stick = document.getElementById('joystick-stick');
-            const maxRadius = 40;
-
-            let joystickActive = false;
-
-            function handleMove(clientX, clientY) {
-                const rect = wrapper.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-
-                let deltaX = clientX - centerX;
-                let deltaY = clientY - centerY;
-                let distance = Math.hypot(deltaX, deltaY);
-
-                if (distance > maxRadius) {
-                    deltaX = (deltaX / distance) * maxRadius;
-                    deltaY = (deltaY / distance) * maxRadius;
-                }
-
-                stick.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-                joystickVector.x = deltaX / maxRadius;
-                joystickVector.y = deltaY / maxRadius;
-            }
-
-            wrapper.addEventListener('touchstart', (e) => {
-                joystickActive = true;
-                handleMove(e.touches[0].clientX, e.touches[0].clientY);
-            });
-
-            window.addEventListener('touchmove', (e) => {
-                if (!joystickActive) return;
-                for (let i = 0; i < e.touches.length; i++) {
-                    if (e.touches[i].target.closest('#joystick-wrapper')) {
-                        handleMove(e.touches[i].clientX, e.touches[i].clientY);
-                    }
-                }
-            });
-
-            const resetJoystick = () => {
-                joystickActive = false;
-                stick.style.transform = 'translate(0px, 0px)';
-                joystickVector = { x: 0, y: 0 };
-            };
-
-            window.addEventListener('touchend', resetJoystick);
-            window.addEventListener('touchcancel', resetJoystick);
-        }
-
-        // --- Event Listeners & Touch Look ---
-        function setupEventListeners() {
-            window.addEventListener('keydown', (e) => keys[e.code] = true);
-            window.addEventListener('keyup', (e) => keys[e.code] = false);
-
-            // Touch Look Controls (Right side of screen)
-            window.addEventListener('touchstart', (e) => {
-                for (let i = 0; i < e.touches.length; i++) {
-                    const touch = e.touches[i];
-                    if (touch.clientX > window.innerWidth / 2 && !touch.target.closest('#mobile-actions') && !touch.target.closest('#hud')) {
-                        isTouchLook = true;
-                        lastTouchX = touch.clientX;
-                        lastTouchY = touch.clientY;
-                    }
-                }
-            });
-
-            window.addEventListener('touchmove', (e) => {
-                if (!isTouchLook) return;
-                for (let i = 0; i < e.touches.length; i++) {
-                    const touch = e.touches[i];
-                    if (touch.clientX > window.innerWidth / 2) {
-                        const deltaX = touch.clientX - lastTouchX;
-                        const deltaY = touch.clientY - lastTouchY;
-
-                        cameraRotation.yaw -= deltaX * 0.005;
-                        cameraRotation.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, cameraRotation.pitch - deltaY * 0.005));
-
-                        lastTouchX = touch.clientX;
-                        lastTouchY = touch.clientY;
-                    }
-                }
-            });
-
-            window.addEventListener('touchend', () => isTouchLook = false);
-
-            // Jump & Break Buttons
-            document.getElementById('btn-jump').addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                if (isGrounded) playerVelocity.y = 8;
-            });
-
-            document.getElementById('btn-action').addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                performBlockAction();
-            });
-
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function performBlockAction() {
-            // Raycast block destruction & Ether harvesting
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-
-            const objects = [];
-            Object.values(loadedChunks).forEach(group => objects.push(...group.children));
-
-            const intersects = raycaster.intersectObjects(objects);
-            if (intersects.length > 0 && intersects[0].distance < 6) {
-                const hit = intersects[0].object;
-                hit.parent.remove(hit);
-
-                // Ether harvest check
-                if (hit.material === materials[activeDimension][3]) {
-                    etherEnergy++;
-                    document.getElementById('ether-count').innerText = etherEnergy;
-                }
-            }
-        }
-
-        function selectSlot(index) {
-            selectedBlockType = index + 1;
-            document.querySelectorAll('.slot').forEach((slot, idx) => {
-                if (idx === index) slot.classList.add('selected');
-                else slot.classList.remove('selected');
-            });
-        }
-
-        function renderHUD() {
-            const hearts = document.getElementById('hearts-container');
-            const food = document.getElementById('food-container');
-            hearts.innerHTML = ''; food.innerHTML = '';
-            for (let i = 0; i < 10; i++) {
-                hearts.innerHTML += '<div class="heart-icon"></div>';
-                food.innerHTML += '<div class="food-icon"></div>';
-            }
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // --- Physics & Game Loop ---
-        function updatePlayer(delta) {
-            // Movement vectors
-            let moveX = 0;
-            let moveZ = 0;
-
-            // Keyboard input
-            if (keys['KeyW']) moveZ -= 1;
-            if (keys['KeyS']) moveZ += 1;
-            if (keys['KeyA']) moveX -= 1;
-            if (keys['KeyD']) moveX += 1;
-            if (keys['Space'] && isGrounded) playerVelocity.y = 8;
-
-            // Joystick input priority
-            if (Math.abs(joystickVector.x) > 0.1 || Math.abs(joystickVector.y) > 0.1) {
-                moveX = joystickVector.x;
-                moveZ = joystickVector.y;
-            }
-
-            // Direction calculation relative to camera yaw
-            const speed = 6;
-            const forward = new THREE.Vector3(Math.sin(cameraRotation.yaw), 0, Math.cos(cameraRotation.yaw));
-            const side = new THREE.Vector3(Math.cos(cameraRotation.yaw), 0, -Math.sin(cameraRotation.yaw));
-
-            const moveDir = new THREE.Vector3()
-                .addScaledVector(forward, -moveZ)
-                .addScaledVector(side, moveX)
-                .normalize();
-
-            playerPos.x += moveDir.x * speed * delta;
-            playerPos.z += moveDir.z * speed * delta;
-
-            // Simple Gravity Physics
-            playerVelocity.y -= 18 * delta; // Gravity
-            playerPos.y += playerVelocity.y * delta;
-
-            if (playerPos.y <= 10) { // Simple ground floor collision
-                playerPos.y = 10;
-                playerVelocity.y = 0;
-                isGrounded = true;
-            } else {
-                isGrounded = false;
-            }
-
-            // Camera Transformation
-            camera.position.copy(playerPos);
-            camera.rotation.order = "YXZ";
-            camera.rotation.y = cameraRotation.yaw;
-            camera.rotation.x = cameraRotation.pitch;
-
-            // Dynamically load chunks based on player location
-            updateChunks();
-        }
-
-        let lastTime = performance.now();
-        function animate() {
-            requestAnimationFrame(animate);
-            const now = performance.now();
-            const delta = Math.min((now - lastTime) / 1000, 0.1);
-            lastTime = now;
-
-            updatePlayer(delta);
-            renderer.render(scene, camera);
-        }
-
-        window.onload = init;
-    </script>
+    <script src="app.js"></script>
 </body>
 </html>
