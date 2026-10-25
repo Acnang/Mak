@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Craft Realm 3D</title>
+    <title>Craft Realm 3D - Remastered</title>
     <link rel="stylesheet" href="style.css">
     <!-- Three.js Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -14,24 +14,28 @@
 
     <canvas id="webgl-canvas"></canvas>
     
-    <!-- 십자선 (1인칭 모드 전용) -->
+    <!-- 십자선 (1인칭 전용) -->
     <div id="crosshair"></div>
 
-    <!-- 상단 상태 & 메뉴 제어바 -->
+    <!-- 상단 바 -->
     <header id="top-bar">
         <button id="btn-menu" class="mc-btn">메뉴</button>
         <div id="dimension-badge" class="mc-badge">차원: <span id="dim-label">오버월드</span></div>
-        <button id="btn-perspective" class="mc-btn">시점 전환 (1P/3P)</button>
+        <button id="btn-perspective" class="mc-btn">시점 (1P/3P)</button>
     </header>
 
-    <!-- 설정 / 메뉴 모달 UI -->
-    <div id="menu-modal" class="hidden">
+    <!-- 설정 / 메뉴 모달 -->
+    <div id="menu-modal" class="modal-overlay hidden">
         <div class="modal-content mc-panel">
             <h2 class="mc-title">게임 설정</h2>
             
             <div class="setting-item">
-                <label for="chunk-slider">오버월드 청크 로딩 거리: <span id="chunk-val">2</span></label>
+                <label for="chunk-slider">청크 로딩 거리: <span id="chunk-val">2</span></label>
                 <input type="range" id="chunk-slider" min="1" max="4" value="2" step="1">
+            </div>
+
+            <div class="setting-item">
+                <button id="btn-open-skin" class="mc-btn">플레이어 스킨 그리기</button>
             </div>
 
             <div class="setting-item">
@@ -43,33 +47,58 @@
                 </div>
             </div>
 
-            <button id="btn-close-menu" class="mc-btn font-bold">닫기</button>
+            <button id="btn-close-menu" class="mc-btn">닫기</button>
         </div>
     </div>
 
-    <!-- 하단 HUD (체력, 허기, 핫바) -->
+    <!-- 플레이어 스킨 그리기 모달 -->
+    <div id="skin-modal" class="modal-overlay hidden">
+        <div class="modal-content mc-panel skin-panel">
+            <h2 class="mc-title">플레이어 커스텀 스킨</h2>
+            <p class="mc-desc">픽셀을 터치하여 아바타를 색칠하세요.</p>
+            
+            <div id="pixel-canvas" class="pixel-grid"></div>
+            
+            <div class="color-palette">
+                <div class="color-swatch active" style="background:#5b3e8c;" data-color="#5b3e8c"></div>
+                <div class="color-swatch" style="background:#866043;" data-color="#866043"></div>
+                <div class="color-swatch" style="background:#567d46;" data-color="#567d46"></div>
+                <div class="color-swatch" style="background:#a33b3b;" data-color="#a33b3b"></div>
+                <div class="color-swatch" style="background:#3b5fa3;" data-color="#3b5fa3"></div>
+                <div class="color-swatch" style="background:#d4af37;" data-color="#d4af37"></div>
+                <div class="color-swatch" style="background:#e5e5e5;" data-color="#e5e5e5"></div>
+                <div class="color-swatch" style="background:#262626;" data-color="#262626"></div>
+            </div>
+
+            <div class="btn-group" style="margin-top: 10px;">
+                <button id="btn-apply-skin" class="mc-btn btn-success">적용하기</button>
+                <button id="btn-close-skin" class="mc-btn">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 HUD (체력 하트 & 핫바) -->
     <div id="hud">
         <div class="status-bar">
             <div id="hearts-container" class="mc-status-row"></div>
-            <div id="food-container" class="mc-status-row"></div>
         </div>
         <div id="hotbar" class="mc-panel">
             <div class="slot selected" onclick="selectSlot(0)"><div class="block-icon grass"></div></div>
             <div class="slot" onclick="selectSlot(1)"><div class="block-icon dirt"></div></div>
             <div class="slot" onclick="selectSlot(2)"><div class="block-icon stone"></div></div>
             <div class="slot" onclick="selectSlot(3)"><div class="block-icon wood"></div></div>
-            <div class="slot" onclick="selectSlot(4)"><div class="block-icon ether"></div></div>
+            <div class="slot" onclick="selectSlot(4)"><div class="block-icon ore"></div></div>
         </div>
     </div>
 
-    <!-- 터치 및 제스처용 원형 조이스틱 영역 -->
+    <!-- 브롤스타즈 스타일 유연성 조이스틱 -->
     <div id="joystick-zone">
         <div id="joystick-base">
             <div id="joystick-handle"></div>
         </div>
     </div>
 
-    <!-- 모바일 터치 전용 행동 버튼 -->
+    <!-- 터치 액션 버튼 -->
     <div id="mobile-controls">
         <button id="btn-jump" class="action-btn mc-btn">점프</button>
         <button id="btn-break" class="action-btn mc-btn btn-danger">파괴</button>
