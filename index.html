@@ -3,28 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Craft Realm 3D - Remastered</title>
+    <title>Craft Realm 3D</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Three.js Library -->
+    <!-- Three.js (r128) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Simplex Noise for Infinite Chunk Terrain -->
+    <!-- Simplex Noise -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simplex-noise/2.4.0/simplex-noise.min.js"></script>
 </head>
 <body>
 
+    <!-- 3D WebGL 캔버스 -->
     <canvas id="webgl-canvas"></canvas>
     
-    <!-- 십자선 (1인칭 전용) -->
+    <!-- 1인칭 십자선 -->
     <div id="crosshair"></div>
 
-    <!-- 상단 바 -->
+    <!-- 상단 컨트롤 바 -->
     <header id="top-bar">
         <button id="btn-menu" class="mc-btn">메뉴</button>
         <div id="dimension-badge" class="mc-badge">차원: <span id="dim-label">오버월드</span></div>
-        <button id="btn-perspective" class="mc-btn">시점 (1P/3P)</button>
+        <button id="btn-perspective" class="mc-btn">시점(1P/3P)</button>
     </header>
 
-    <!-- 설정 / 메뉴 모달 -->
+    <!-- 설정 모달 -->
     <div id="menu-modal" class="modal-overlay hidden">
         <div class="modal-content mc-panel">
             <h2 class="mc-title">게임 설정</h2>
@@ -35,7 +36,7 @@
             </div>
 
             <div class="setting-item">
-                <button id="btn-open-skin" class="mc-btn">플레이어 스킨 그리기</button>
+                <button id="btn-open-skin" class="mc-btn font-bold">플레이어 스킨 그리기</button>
             </div>
 
             <div class="setting-item">
@@ -51,11 +52,11 @@
         </div>
     </div>
 
-    <!-- 플레이어 스킨 그리기 모달 -->
+    <!-- 플레이어 커스텀 스킨 모달 -->
     <div id="skin-modal" class="modal-overlay hidden">
         <div class="modal-content mc-panel skin-panel">
-            <h2 class="mc-title">플레이어 커스텀 스킨</h2>
-            <p class="mc-desc">픽셀을 터치하여 아바타를 색칠하세요.</p>
+            <h2 class="mc-title">스킨 커스터마이징</h2>
+            <p class="mc-desc">픽셀 셀을 클릭/터치하여 원하는 색으로 칠하세요.</p>
             
             <div id="pixel-canvas" class="pixel-grid"></div>
             
@@ -66,18 +67,18 @@
                 <div class="color-swatch" style="background:#a33b3b;" data-color="#a33b3b"></div>
                 <div class="color-swatch" style="background:#3b5fa3;" data-color="#3b5fa3"></div>
                 <div class="color-swatch" style="background:#d4af37;" data-color="#d4af37"></div>
-                <div class="color-swatch" style="background:#e5e5e5;" data-color="#e5e5e5"></div>
                 <div class="color-swatch" style="background:#262626;" data-color="#262626"></div>
+                <div class="color-swatch" style="background:#ffffff;" data-color="#ffffff"></div>
             </div>
 
-            <div class="btn-group" style="margin-top: 10px;">
-                <button id="btn-apply-skin" class="mc-btn btn-success">적용하기</button>
+            <div class="btn-group" style="margin-top: 8px;">
+                <button id="btn-apply-skin" class="mc-btn btn-success">스킨 적용</button>
                 <button id="btn-close-skin" class="mc-btn">취소</button>
             </div>
         </div>
     </div>
 
-    <!-- 하단 HUD (체력 하트 & 핫바) -->
+    <!-- HUD 체력 및 핫바 -->
     <div id="hud">
         <div class="status-bar">
             <div id="hearts-container" class="mc-status-row"></div>
@@ -91,7 +92,7 @@
         </div>
     </div>
 
-    <!-- 브롤스타즈 스타일 유연성 조이스틱 -->
+    <!-- 유연성 원형 조이스틱 영역 -->
     <div id="joystick-zone">
         <div id="joystick-base">
             <div id="joystick-handle"></div>
